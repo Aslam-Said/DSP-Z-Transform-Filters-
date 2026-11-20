@@ -1,0 +1,105 @@
+%% DSP Lab 2 - Simple Solution
+clc; clear; close all;
+
+%% 
+z = [2 3 4 5];           % zeros
+p = [0.1 0.3 0.5 0.7];   % poles
+
+b = poly(z)              % (a) numerator coefficients
+a = poly(p)              % (b) denominator coefficients
+                         % (c) H(z) = b/a  -> use these b and a vectors
+H1 = tf(b, a, 1)
+
+sos = zp2sos(z, p, 1)    % (d) second order sections
+
+figure; zplane(z', p');  % (e) z-plane
+title('Q1: Pole-Zero Plot');
+
+% (f) Stability: all poles (0.1,0.3,0.5,0.7) are inside the unit circle
+% -> the system is STABLE (zeros outside the circle don't affect stability).
+disp(all(abs(p) < 1))    % 1 = stable
+
+%% ================= Question 2 =================
+b2 = [1 -2 2 -1];                               % numerator (in z^-1)
+a2 = conv(conv([1 -1], [1 -0.5]), [1 -0.2]);    % denominator (in z^-1)
+
+H2 = tf(b2, a2, 1);
+figure; pzmap(H2); grid on; title('Q2: Pole-Zero Map');
+% Poles: 1, 0.5, 0.2.  The numerator = (1 - z^-1)(1 - z^-1 + z^-2),
+% so the zero at z = 1 CANCELS the pole at z = 1.
+% Remaining poles (0.5, 0.2) are inside the unit circle -> STABLE
+% (the ROC includes the unit circle after the cancellation).
+
+h = filter(b2, a2, [1 zeros(1,49)]);            % impulse response
+figure; stem(0:49, h); grid on;
+title('Q2: Impulse Response'); xlabel('n'); ylabel('h[n]');
+
+figure; freqz(b2, a2, 512);                     % frequency response
+title('Q2: Frequency Response');
+
+%% ================= Question 3 =================
+syms n
+X_a = ztrans(sym(1))     % u(n)    -> z/(z-1)
+X_b = ztrans(2^n)        % 2^n u(n) -> z/(z-2)
+X_c = ztrans(n)          % n u(n)  -> z/(z-1)^2
+
+%% ================= Question 4 =================
+% H(z) = (z+1)/(z^2+3z+2). Divide by z^2 to get powers of z^-1:
+b4 = [0 1 1];
+a4 = [1 3 2];
+[r, pp, k] = residuez(b4, a4)
+% Note: (z+1)/((z+1)(z+2)) = 1/(z+2), so the pole at -1 has residue ~0.
+% Result: H(z) = -0.5 + 0.5/(1 + 2 z^-1)
+
+%% ================= Question 5 =================
+b5 = [0.03 -0.02 0.01];
+a5 = [1 -2.8 3.02 -1.468 0.27];
+H5 = tf(b5, a5, 1)                              % (a) transfer function
+
+figure; zplane(b5, a5); title('Q5: Pole-Zero Plot');   % (b)
+poles5 = roots(a5)
+disp(max(abs(poles5)))   % if < 1 -> stable, if >= 1 -> not stable
+
+N = 60;
+x = 5 * ones(1, N);                             % x[n] = 5u[n]
+
+y1 = filter(b5, a5, x);                         % I. relaxed system
+
+zi = filtic(b5, a5, [-0.2 0.3 0 0]);            % II. y[-1..-4]
+y2 = filter(b5, a5, x, zi);
+
+figure;
+subplot(2,1,1); stem(0:N-1, y1); grid on; title('Relaxed (zero initial conditions)');
+subplot(2,1,2); stem(0:N-1, y2); grid on; title('With initial conditions'); xlabel('n');
+
+%% ================= Question 6 =================
+x = ones(1, 10);
+
+ya = filter([1 0.5 2], 1, x);        % (a)
+yb = filter(1, [1 -0.8], x);         % (b)
+yc = filter([0 1], [1 -0.8], x);     % (c)  x[n-1] on the right side
+
+figure;
+subplot(3,1,1); stem(ya); title('(a)'); grid on;
+subplot(3,1,2); stem(yb); title('(b)'); grid on;
+subplot(3,1,3); stem(yc); title('(c)'); grid on;
+
+% Steady state of (a) = sum of coefficients = 1 + 0.5 + 2 = 3.5
+% (c) is just (b) delayed by one sample (the extra x[n-1] = a delay).
+
+% y[n] = x[n] - x[n-1]  (difference / edge detector)
+x2 = [1 1 1 1 1 2 1 1 1 1 1];
+yd = filter([1 -1], 1, x2)
+figure; stem(yd); grid on; title('y[n] = x[n] - x[n-1]');
+% Output is 0 where the input is constant, and shows +1 / -1 where it
+% changes. It is a high-pass filter: it detects changes and removes DC.
+
+% Moving average filter of order five
+bm = ones(1, 5) / 5;
+x3 = [1 1 1 1 1 1 1 2 1 1 1 1];
+ym = filter(bm, 1, x3)
+figure;
+stem(x3, 'filled'); hold on; stem(ym); grid on;
+legend('Input', 'Moving average output');
+% The sudden spike is smoothed (reduced to 1.2 and spread over 5 samples).
+% It is a low-pass filter: it removes sharp changes/noise.
